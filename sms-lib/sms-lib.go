@@ -39,6 +39,12 @@ type ALiYunCommunicationRequest struct {
 	TemplateParam   string
 	SmsUpExtendCode string
 	OutId           string
+
+	PhoneNumber     string
+	BizId           string
+	SendDate        string
+	PageSize        string
+	CurrentPage     string
 }
 
 var encoding = base32.NewEncoding("ybndrfg8ejkmcpqxot1uwisza345h897")
@@ -79,6 +85,33 @@ func (req *ALiYunCommunicationRequest) SetParamsValue(accessKeyId, phoneNumbers,
 	return nil
 }
 
+func (req *ALiYunCommunicationRequest) SetQueryParamsValue(accessKeyId, PhoneNumber, SendDate, PageSize, CurrentPage string) error {
+	req.AccessKeyId = accessKeyId
+	now := time.Now()
+	local, err := time.LoadLocation("GMT")
+	if err != nil {
+		return err
+	}
+	req.Timestamp = now.In(local).Format("2006-01-02T15:04:05Z")
+	fmt.Println("time:", req.Timestamp)
+	req.Format = "json"
+	req.SignatureMethod = "HMAC-SHA1"
+	req.SignatureVersion = "1.0"
+	req.SignatureNonce = NewId()
+	fmt.Println("req.SignatureNonce:", req.SignatureNonce)
+
+	req.Action = "QuerySendDetails"
+	req.Version = "2017-05-25"
+	req.RegionId = "cn-hangzhou"
+	req.PhoneNumber = PhoneNumber
+	req.SendDate = SendDate
+	req.PageSize = PageSize
+	req.CurrentPage = CurrentPage
+	req.SmsUpExtendCode = "90999"
+	req.OutId = "abcdefg"
+	return nil
+}
+
 func (req *ALiYunCommunicationRequest) SmsParamsIsValid() error {
 	if len(req.AccessKeyId) == 0 {
 		return errors.New("AccessKeyId required")
@@ -98,6 +131,30 @@ func (req *ALiYunCommunicationRequest) SmsParamsIsValid() error {
 
 	if len(req.TemplateParam) == 0 {
 		return errors.New("TemplateParam required")
+	}
+
+	return nil
+}
+
+func (req *ALiYunCommunicationRequest) QueryParamsIsValid() error {
+	if len(req.AccessKeyId) == 0 {
+		return errors.New("AccessKeyId required")
+	}
+
+	if len(req.PhoneNumber) == 0 {
+		return errors.New("PhoneNumber required")
+	}
+
+	if len(req.SendDate) == 0 {
+		return errors.New("SendDate required")
+	}
+
+	if len(req.PageSize) == 0 {
+		return errors.New("PageSize required")
+	}
+
+	if len(req.CurrentPage) == 0 {
+		return errors.New("CurrentPage required")
 	}
 
 	return nil
@@ -128,6 +185,37 @@ func (req *ALiYunCommunicationRequest) BuildSmsRequestEndpoint(accessKeySecret, 
 	businessParams["TemplateCode"] = req.TemplateCode
 	businessParams["SmsUpExtendCode"] = req.SmsUpExtendCode
 	businessParams["OutId"] = req.OutId
+	// generate signature and sorted  query
+	sortQueryString, signature := generateQueryStringAndSignature(businessParams, systemParams, accessKeySecret)
+	fmt.Println("Signature:", signature)
+	fmt.Println("sortQueryString:", sortQueryString)
+	return gatewayUrl + "?Signature=" + signature + sortQueryString, nil
+}
+
+func (req *ALiYunCommunicationRequest) BuildQueryRequestEndpoint(accessKeySecret, gatewayUrl string) (string, error) {
+	var err error
+	if err = req.QueryParamsIsValid(); err != nil {
+		return "", err
+	}
+	// common params
+	systemParams := make(map[string]string)
+	systemParams["SignatureMethod"] = req.SignatureMethod
+	systemParams["SignatureNonce"] = req.SignatureNonce
+	systemParams["AccessKeyId"] = req.AccessKeyId
+	systemParams["SignatureVersion"] = req.SignatureVersion
+	systemParams["Timestamp"] = req.Timestamp
+	systemParams["Format"] = req.Format
+
+	// business params
+	businessParams := make(map[string]string)
+	businessParams["Action"] = req.Action
+	businessParams["Version"] = req.Version
+	businessParams["RegionId"] = req.RegionId
+
+	businessParams["PhoneNumber"] = req.PhoneNumber
+	businessParams["SendDate"] = req.SendDate
+	businessParams["PageSize"] = req.PageSize
+	businessParams["CurrentPage"] = req.CurrentPage
 	// generate signature and sorted  query
 	sortQueryString, signature := generateQueryStringAndSignature(businessParams, systemParams, accessKeySecret)
 	fmt.Println("Signature:", signature)

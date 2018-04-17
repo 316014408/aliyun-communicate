@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/KenmyZhang/aliyun-communicate/sms-lib"
+	"github.com/316014408/aliyun-communicate/sms-lib"
 )
 
 type SmsClient struct {
@@ -30,6 +30,34 @@ func (smsClient *SmsClient) Execute(accessKeyId, accessKeySecret, phoneNumbers, 
 		return nil, err
 	}
 	endpoint, err := smsClient.Request.BuildSmsRequestEndpoint(accessKeySecret, smsClient.GatewayUrl)
+	if err != nil {
+		return nil, err
+	}
+
+	request, _ := http.NewRequest("GET", endpoint, nil)
+	response, err := smsClient.Client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	result := new(Response)
+	err = json.Unmarshal(body, result)
+
+	result.RawResponse = body
+	return result, err
+}
+
+func (smsClient *SmsClient) Query(accessKeyId, accessKeySecret, PhoneNumber, SendDate, PageSize, CurrentPage string) (*Response, error) {
+	err := smsClient.Request.SetQueryParamsValue(accessKeyId, PhoneNumber, SendDate, PageSize, CurrentPage)
+	if err != nil {
+		return nil, err
+	}
+	endpoint, err := smsClient.Request.BuildQueryRequestEndpoint(accessKeySecret, smsClient.GatewayUrl)
 	if err != nil {
 		return nil, err
 	}
